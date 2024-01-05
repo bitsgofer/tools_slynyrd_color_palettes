@@ -3,7 +3,9 @@ use iced::mouse;
 use iced::widget::canvas::{self, Canvas, Frame, Geometry, Path};
 use iced::widget::{column, row, text, Slider};
 use iced::{Color, Element, Length, Point, Rectangle, Renderer, Sandbox, Settings, Size, Vector};
-use palette::{self, convert::FromColor, rgb::Rgb, Darken, Hsl, Lighten, ShiftHue};
+use palette::{
+    self, convert::FromColor, rgb::Rgb, Darken, Desaturate, Hsl, Hsv, Lighten, Saturate, ShiftHue,
+};
 use std::marker::PhantomData;
 use std::ops::RangeInclusive;
 
@@ -56,7 +58,7 @@ impl Sandbox for ColorPalette {
             Message::LchColorChanged(lch) => Rgb::from_color(lch),
         };
 
-        self.theme = Theme::new(srgb);
+        self.theme = Theme::new(srgb, 9); // TODO(mtong): get colors_per_ramp
     }
 
     fn view(&self) -> Element<Message> {
@@ -85,32 +87,47 @@ impl Sandbox for ColorPalette {
 }
 
 #[derive(Debug)]
+/// Represents the GUI we will display on screen.
 struct Theme {
-    lower: Vec<Color>,
-    base: Color,
-    higher: Vec<Color>,
     canvas_cache: canvas::Cache,
+
+    // /// How many color ramps do we want. We will hue-shift by 360/ramps_count.
+    // ramps_count: u8,
+
+    // base ramp
+    lower: Vec<Color>, // TODO(mtong): rename -> left
+    base: Color,
+    higher: Vec<Color>, // TODO(mtong): rename -> right
+
+                        // /// `ramps_count - 1` others that are hue-shifted from the base ramp
+                        // hue_shifted: Vec<Vec<Color>>, // TODO(mtong): when render, re-arrange so the base ramp is the vertical middle
 }
 
 impl Theme {
-    pub fn new(base: impl Into<Color>) -> Theme {
+    // How many colors we want per ramp should be an odd number
+    // so we have the same amount left and right of the base color.
+    pub fn new(base: impl Into<Color>, _colors_per_ramp: u8) -> Theme {
         let base = base.into();
 
         // Convert to HSL color for manipulation
-        let hsl = Hsl::from_color(Rgb::from(base));
+        let hsv = Hsv::from_color(Rgb::from(base));
+
+        // TODO(mtong): ensure colors_per_ramp is odd
+        let _left_most = -1 * ((_colors_per_ramp as i64) / 2);
+        // TODO(mtong): read custom list of changes to S and V, then create colors
 
         let lower = [
-            hsl.shift_hue(-135.0).lighten(0.075),
-            hsl.shift_hue(-120.0),
-            hsl.shift_hue(-105.0).darken(0.075),
-            hsl.darken(0.075),
+            hsv.shift_hue(-80.0).desaturate_fixed(0.8).darken(0.8),
+            hsv.shift_hue(-60.0).desaturate_fixed(0.6).darken(0.6),
+            hsv.shift_hue(-40.0).desaturate_fixed(0.4).darken(0.4),
+            hsv.shift_hue(-20.0).desaturate_fixed(0.2).darken(0.2),
         ];
 
         let higher = [
-            hsl.lighten(0.075),
-            hsl.shift_hue(105.0).darken(0.075),
-            hsl.shift_hue(120.0),
-            hsl.shift_hue(135.0).lighten(0.075),
+            hsv.shift_hue(20.0).saturate_fixed(0.2).lighten(0.2),
+            hsv.shift_hue(40.0).saturate_fixed(0.4).lighten(0.4),
+            hsv.shift_hue(60.0).saturate_fixed(0.6).lighten(0.6),
+            hsv.shift_hue(80.0).saturate_fixed(0.8).lighten(0.8),
         ];
 
         Theme {
@@ -168,6 +185,8 @@ impl Theme {
         };
 
         for (i, &color) in self.colors().enumerate() {
+            println!("COLOR: {}", color_hex_string(&color));
+
             let anchor = Point {
                 x: (i as f32) * box_size.width,
                 y: 0.0,
@@ -255,7 +274,9 @@ impl<Message> canvas::Program<Message> for Theme {
 
 impl Default for Theme {
     fn default() -> Self {
-        Theme::new(Color::from_rgb8(75, 128, 190))
+        let base_color = Color::from_rgb8(28, 217, 217);
+        let colors_per_ramp = 9;
+        Theme::new(base_color, colors_per_ramp) // TODO(mtong): Set base color
     }
 }
 
