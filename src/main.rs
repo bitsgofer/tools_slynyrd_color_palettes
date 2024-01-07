@@ -1,6 +1,10 @@
 use iced::executor;
-use iced::widget::{container, text};
-use iced::{Application, Command, Element, Settings, Theme};
+use iced::mouse;
+use iced::widget::canvas::{self, Canvas, Frame, Geometry, Path};
+use iced::widget::{column, container, text};
+use iced::{
+    Application, Command, Element, Length, Point, Rectangle, Renderer, Settings, Size, Theme,
+};
 use palette::{self, convert::FromColor, rgb::Rgb, Hsv};
 
 /// Stores configuration to generate the palette.
@@ -26,6 +30,8 @@ struct Config {
 
 struct PaletteGenerator {
     cfg: Config,
+    // A cached drawing that only redraw on dimension changes OR when asked.
+    canvas_cache: canvas::Cache,
 }
 
 impl Default for PaletteGenerator {
@@ -38,6 +44,7 @@ impl Default for PaletteGenerator {
                 colors_per_ramp: 9,
                 ramps_per_palette: 8,
             },
+            canvas_cache: canvas::Cache::default(),
         }
     }
 }
@@ -69,8 +76,44 @@ impl Application for PaletteGenerator {
             "base color: (HSV={:?}, RGB= {:?}); {} ramps with {} colors/ramp",
             self.cfg.base_color_hsv, rgb, self.cfg.ramps_per_palette, self.cfg.colors_per_ramp
         );
-        let hello = text(cfg_text);
-        container(hello).into()
+        let hello: text::Text = text(cfg_text);
+
+        let cv: Canvas<&PaletteGenerator, Message> =
+            Canvas::new(self).width(Length::Fill).height(Length::Fill);
+
+        column![hello, cv,].padding(10).spacing(10).into()
+    }
+}
+
+impl<Message> canvas::Program<Message, Renderer> for PaletteGenerator {
+    type State = ();
+
+    // Required method
+    fn draw(
+        &self,
+        _state: &Self::State,
+        renderer: &Renderer,
+        _theme: &iced::Theme,
+        bounds: Rectangle,
+        _cursor: mouse::Cursor,
+    ) -> Vec<Geometry> {
+        let rec = self.canvas_cache.draw(renderer, bounds.size(), |frame| {
+            let pad = 20.0;
+
+            let box_size = Size {
+                width: frame.width() / 2.0 as f32,
+                height: frame.height() / 2.0 - pad,
+            };
+
+            let anchor = Point { x: 0.0, y: 0.0 };
+
+            let rgb = Rgb::from_color(self.cfg.base_color_hsv);
+            let color = iced::Color::from_rgb(rgb.red, rgb.green, rgb.blue);
+
+            frame.fill_rectangle(anchor, box_size, color);
+        });
+
+        vec![rec]
     }
 }
 
