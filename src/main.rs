@@ -13,7 +13,7 @@ struct Config {
     /// This color basically controls the rest of the palette generation.
     ///
     /// Example pick: flesh-tone, one of the main theme's colors, etc.
-    base_color_hsv: Hsv,
+    hsv_base: Hsv,
 
     /// How many colors are in a single ramp. This MUST be an odd number.
     // TODO(mtong): make a Odd type for this
@@ -36,11 +36,11 @@ struct PaletteGenerator {
 
 impl Default for PaletteGenerator {
     fn default() -> PaletteGenerator {
-        let base = Hsv::new(180.0, 87.0, 85.0);
+        let hsv = Hsv::new(180.0, 87.0, 85.0);
 
         PaletteGenerator {
             cfg: Config {
-                base_color_hsv: base,
+                hsv_base: hsv,
                 colors_per_ramp: 9,
                 ramps_per_palette: 8,
             },
@@ -71,10 +71,10 @@ impl Application for PaletteGenerator {
     }
 
     fn view(&self) -> Element<Self::Message> {
-        let rgb = Rgb::from_color(self.cfg.base_color_hsv);
+        let rgb = Rgb::from_color(self.cfg.hsv_base);
         let cfg_text = format!(
             "base color: (HSV={:?}, RGB= {:?}); {} ramps with {} colors/ramp",
-            self.cfg.base_color_hsv, rgb, self.cfg.ramps_per_palette, self.cfg.colors_per_ramp
+            self.cfg.hsv_base, rgb, self.cfg.ramps_per_palette, self.cfg.colors_per_ramp
         );
         let hello: text::Text = text(cfg_text);
 
@@ -88,7 +88,6 @@ impl Application for PaletteGenerator {
 impl<Message> canvas::Program<Message, Renderer> for PaletteGenerator {
     type State = ();
 
-    // Required method
     fn draw(
         &self,
         _state: &Self::State,
@@ -107,7 +106,7 @@ impl<Message> canvas::Program<Message, Renderer> for PaletteGenerator {
 
             let anchor = Point { x: 0.0, y: 0.0 };
 
-            let rgb = Rgb::from_color(self.cfg.base_color_hsv);
+            let rgb = Rgb::from_color(self.cfg.hsv_base);
             let color = iced::Color::from_rgb(rgb.red, rgb.green, rgb.blue);
 
             frame.fill_rectangle(anchor, box_size, color);
