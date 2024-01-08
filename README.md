@@ -36,10 +36,10 @@ This also serve as a learning project for Rust & one of its GUI lib, `iced`.
 ## Goals
 
 - Core
-  - [ ] GUI on Linux
-  - [ ] Generate everything based on a base color.
-  - [ ] Use Hue-Saturation-Value (HSV/HSB) to choose the base color.
-  - [ ] Show 8 ramps with 9 color/ramp.
+  - [x] GUI on Linux
+  - [x] Generate everything based on a base color.
+  - [x] Use Hue-Saturation-Value (HSV/HSB) to choose the base color.
+  - [x] Show 8 ramps with 9 color/ramp.
   - [ ] Show hexadecimal color codes.
 - Stretch
   - [ ] Cross-platform GUI (native + web)
