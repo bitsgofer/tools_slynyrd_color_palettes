@@ -27,7 +27,9 @@ My goal is to create pixel art for games with visual similar to these:
 To that end, I believe a rich palette using SLYNYRD's technique will be useful.
 Something like this:
 
-![](images/swatches.png)
+![color swatch](images/swatches.png)
+
+![actual program](images/program.png)
 
 However, generating it by hand is pretty tedious, so I wanted a small GUI.
 
