@@ -6,6 +6,9 @@ use iced::{
     Application, Command, Element, Length, Point, Rectangle, Renderer, Settings, Size, Theme,
 };
 use palette::{self, convert::FromColor, rgb::Rgb, Hsv, Lighten, RgbHue, Saturate, ShiftHue};
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
 
 /// Stores configuration to generate the palette.
 struct Config {
@@ -158,12 +161,12 @@ impl<Message> canvas::Program<Message, Renderer> for PaletteGenerator {
                 for j in 0..n {
                     let hsv = ramp[j];
                     let rgb = Rgb::from_color(hsv);
-                    let (red, green, blue) = rgb8_from_rgb(&rgb);
-                    let (hue, saturation, value) = hsv8_from_hsv(&hsv);
-                    println!(
-                        "draw: H={}, S= {}, V= {} ||| R={}, G= {}, B= {}",
-                        red, green, blue, hue, saturation, value
-                    );
+                    // let (red, green, blue) = rgb8_from_rgb(&rgb);
+                    // let (hue, saturation, value) = hsv8_from_hsv(&hsv);
+                    // println!(
+                    //     "draw: H={}, S= {}, V= {} ||| R={}, G= {}, B= {}",
+                    //     red, green, blue, hue, saturation, value
+                    // );
 
                     let color = iced::Color::from_rgb(rgb.red, rgb.green, rgb.blue);
 
@@ -180,6 +183,16 @@ impl<Message> canvas::Program<Message, Renderer> for PaletteGenerator {
 }
 
 pub fn main() -> iced::Result {
+    let cfg = PaletteGenerator::default().cfg;
+    let ramps = generate_ramps(
+        cfg.hsv_base,
+        cfg.colors_per_ramp as usize,
+        &cfg.base_ramp_saturation_deltas,
+        &cfg.base_ramp_brightness_deltas,
+        cfg.ramps_per_palette as usize,
+    );
+    save_palette(&ramps, "my_palette", PathBuf::from("my_palette.gpl")).unwrap();
+
     PaletteGenerator::run(Settings::default())
 }
 
@@ -209,6 +222,7 @@ fn generate_ramps(
         abs_hue_deltas[i] = abs_hue_deltas[i - 1] + hue_step_per_ramp;
     }
 
+    // generate the base ramp
     let mut base_ramp = Vec::<Hsv>::new();
     for i in 0..colors_per_ramp {
         let color = hsv_base
@@ -217,9 +231,24 @@ fn generate_ramps(
             .lighten_fixed(abs_brightness_deltas[i] / 100.0);
         base_ramp.push(color);
     }
+    // also generate the de-saturated half of the base ramp
+    for i in (1..(colors_per_ramp - 1)).rev() {
+        let color = base_ramp[i].saturate(-70.0 / 100.0);
+        base_ramp.push(color);
+    }
 
+    // generate all ramps
     let mut ramps: Vec<Vec<Hsv>> = vec![];
 
+    // grayscale ramp
+    let mut grayscale_ramp: Vec<Hsv> = vec![];
+    for (_, base_ramp_color) in base_ramp.iter().enumerate() {
+        let color = base_ramp_color.saturate_fixed(-100.0);
+        grayscale_ramp.push(color);
+    }
+    ramps.push(grayscale_ramp);
+
+    // upper half, above the base ramp
     let hue_shift_per_ramp = 360.0 / ramps_per_palette as f32;
     let base_ramp_index = ramps_per_palette / 2;
     for i in 0..base_ramp_index {
@@ -235,8 +264,10 @@ fn generate_ramps(
         ramps.push(ramp);
     }
 
+    // base ramp (~vertical middle)
     ramps.push(base_ramp.to_vec());
 
+    // lower half, below the base ramp
     for i in (base_ramp_index + 1)..ramps_per_palette {
         let mut ramp: Vec<Hsv> = vec![];
 
@@ -303,4 +334,42 @@ fn hsv8_to_hsv(hue: f32, saturation: f32, value: f32) -> Result<Hsv, &'static st
         saturation as f32 / 100.0,
         value as f32 / 100.0,
     ))
+}
+
+fn save_palette(
+    ramps: &Vec<Vec<Hsv>>,
+    paletteName: &str,
+    path: std::path::PathBuf,
+) -> std::io::Result<()> {
+    let gplPalettePath = PathBuf::from("my_palette.gpl");
+
+    let colors = flatten(ramps.to_vec());
+
+    let mut file = File::create(&gplPalettePath)?;
+
+    write!(file, "GIMP Palette\n")?;
+    write!(file, "Name: {}\n\n", paletteName)?;
+    // write colors
+    for (i, _) in colors.iter().enumerate() {
+        let hsv = colors[i];
+        let rgb = Rgb::from_color(hsv);
+        let (red, green, blue) = rgb8_from_rgb(&rgb);
+        let hex = color_hex_string(&rgb);
+        write!(file, "{} {} {}\t{}\n", red, green, blue, hex);
+    }
+
+    Ok(())
+}
+
+fn flatten<T>(nested: Vec<Vec<T>>) -> Vec<T> {
+    nested.into_iter().flatten().collect()
+}
+
+fn color_hex_string(color: &Rgb) -> String {
+    format!(
+        "#{:02X}{:02X}{:02X}",
+        (255.0 * color.red).round() as u8,
+        (255.0 * color.green).round() as u8,
+        (255.0 * color.blue).round() as u8,
+    )
 }
