@@ -6,6 +6,9 @@ use iced::{
     Application, Command, Element, Length, Point, Rectangle, Renderer, Settings, Size, Theme,
 };
 use palette::{self, convert::FromColor, rgb::Rgb, Hsv, Lighten, RgbHue, Saturate, ShiftHue};
+use std::fs::File;
+use std::io::Write;
+use std::path::PathBuf;
 
 /// Stores configuration to generate the palette.
 struct Config {
@@ -180,6 +183,16 @@ impl<Message> canvas::Program<Message, Renderer> for PaletteGenerator {
 }
 
 pub fn main() -> iced::Result {
+    let cfg = PaletteGenerator::default().cfg;
+    let ramps = generate_ramps(
+        cfg.hsv_base,
+        cfg.colors_per_ramp as usize,
+        &cfg.base_ramp_saturation_deltas,
+        &cfg.base_ramp_brightness_deltas,
+        cfg.ramps_per_palette as usize,
+    );
+    save_palette(&ramps, "my_palette", PathBuf::from("my_palette.gpl")).unwrap();
+
     PaletteGenerator::run(Settings::default())
 }
 
@@ -321,4 +334,42 @@ fn hsv8_to_hsv(hue: f32, saturation: f32, value: f32) -> Result<Hsv, &'static st
         saturation as f32 / 100.0,
         value as f32 / 100.0,
     ))
+}
+
+fn save_palette(
+    ramps: &Vec<Vec<Hsv>>,
+    paletteName: &str,
+    path: std::path::PathBuf,
+) -> std::io::Result<()> {
+    let gplPalettePath = PathBuf::from("my_palette.gpl");
+
+    let colors = flatten(ramps.to_vec());
+
+    let mut file = File::create(&gplPalettePath)?;
+
+    write!(file, "GIMP Palette\n")?;
+    write!(file, "Name: {}\n\n", paletteName)?;
+    // write colors
+    for (i, _) in colors.iter().enumerate() {
+        let hsv = colors[i];
+        let rgb = Rgb::from_color(hsv);
+        let (red, green, blue) = rgb8_from_rgb(&rgb);
+        let hex = color_hex_string(&rgb);
+        write!(file, "{} {} {}\t{}\n", red, green, blue, hex);
+    }
+
+    Ok(())
+}
+
+fn flatten<T>(nested: Vec<Vec<T>>) -> Vec<T> {
+    nested.into_iter().flatten().collect()
+}
+
+fn color_hex_string(color: &Rgb) -> String {
+    format!(
+        "#{:02X}{:02X}{:02X}",
+        (255.0 * color.red).round() as u8,
+        (255.0 * color.green).round() as u8,
+        (255.0 * color.blue).round() as u8,
+    )
 }
