@@ -158,12 +158,12 @@ impl<Message> canvas::Program<Message, Renderer> for PaletteGenerator {
                 for j in 0..n {
                     let hsv = ramp[j];
                     let rgb = Rgb::from_color(hsv);
-                    let (red, green, blue) = rgb8_from_rgb(&rgb);
-                    let (hue, saturation, value) = hsv8_from_hsv(&hsv);
-                    println!(
-                        "draw: H={}, S= {}, V= {} ||| R={}, G= {}, B= {}",
-                        red, green, blue, hue, saturation, value
-                    );
+                    // let (red, green, blue) = rgb8_from_rgb(&rgb);
+                    // let (hue, saturation, value) = hsv8_from_hsv(&hsv);
+                    // println!(
+                    //     "draw: H={}, S= {}, V= {} ||| R={}, G= {}, B= {}",
+                    //     red, green, blue, hue, saturation, value
+                    // );
 
                     let color = iced::Color::from_rgb(rgb.red, rgb.green, rgb.blue);
 
@@ -209,6 +209,7 @@ fn generate_ramps(
         abs_hue_deltas[i] = abs_hue_deltas[i - 1] + hue_step_per_ramp;
     }
 
+    // generate the base ramp
     let mut base_ramp = Vec::<Hsv>::new();
     for i in 0..colors_per_ramp {
         let color = hsv_base
@@ -217,9 +218,24 @@ fn generate_ramps(
             .lighten_fixed(abs_brightness_deltas[i] / 100.0);
         base_ramp.push(color);
     }
+    // also generate the de-saturated half of the base ramp
+    for i in (1..(colors_per_ramp - 1)).rev() {
+        let color = base_ramp[i].saturate(-70.0 / 100.0);
+        base_ramp.push(color);
+    }
 
+    // generate all ramps
     let mut ramps: Vec<Vec<Hsv>> = vec![];
 
+    // grayscale ramp
+    let mut grayscale_ramp: Vec<Hsv> = vec![];
+    for (_, base_ramp_color) in base_ramp.iter().enumerate() {
+        let color = base_ramp_color.saturate_fixed(-100.0);
+        grayscale_ramp.push(color);
+    }
+    ramps.push(grayscale_ramp);
+
+    // upper half, above the base ramp
     let hue_shift_per_ramp = 360.0 / ramps_per_palette as f32;
     let base_ramp_index = ramps_per_palette / 2;
     for i in 0..base_ramp_index {
@@ -235,8 +251,10 @@ fn generate_ramps(
         ramps.push(ramp);
     }
 
+    // base ramp (~vertical middle)
     ramps.push(base_ramp.to_vec());
 
+    // lower half, below the base ramp
     for i in (base_ramp_index + 1)..ramps_per_palette {
         let mut ramp: Vec<Hsv> = vec![];
 
